@@ -52,7 +52,7 @@ Resources:
             Effect: Allow
             Resource: !Sub "arn:${AWS::Partition}:s3:::${BucketNameBackup}-${AWS::AccountId}/*"
             Principal: 
-              AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:Administrator
+              AWS: !Sub arn:aws:iam::674078804300:user/Administrator
 # ------------------------------------------------------------#
 # S3 prod
 # ------------------------------------------------------------#
