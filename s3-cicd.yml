@@ -36,9 +36,6 @@ Resources:
             - ServerSideEncryptionByDefault:
                 SSEAlgorithm: AES256
               BucketKeyEnabled: true
-
-      WebsiteConfiguration: 
-        IndexDocument: index.html
       Tags:
         - Key: Name
           Value: !Sub ${BucketNameBackup}-${AWS::AccountId}
@@ -76,9 +73,6 @@ Resources:
             - ServerSideEncryptionByDefault:
                 SSEAlgorithm: AES256
               BucketKeyEnabled: true
-
-      WebsiteConfiguration: 
-        IndexDocument: index.html
       Tags:
         - Key: Name
           Value: !Sub ${BucketNameProd}-${AWS::AccountId}
@@ -95,4 +89,4 @@ Resources:
             Effect: Allow
             Resource: !Sub "arn:${AWS::Partition}:s3:::${BucketNameProd}-${AWS::AccountId}/*"
             Principal: 
-              AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:Administrator
+              AWS: !Sub arn:aws:iam::674078804300:user/Administrator
