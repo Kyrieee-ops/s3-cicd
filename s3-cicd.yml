@@ -90,3 +90,16 @@ Resources:
             Resource: !Sub "arn:${AWS::Partition}:s3:::${BucketNameProd}-${AWS::AccountId}/*"
             Principal: 
               AWS: !Sub arn:aws:iam::674078804300:user/Administrator
+
+Outputs:
+  s3bucketbackup:
+    Value: !Ref s3bucketbackup
+    Export: 
+      Name: s3bucketbackup
+
+  s3BucketPolicyProd:
+    Value: !Ref s3bucketprod
+    Export:
+      Name: s3bucketprod
+    
+
