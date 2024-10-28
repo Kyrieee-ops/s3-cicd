@@ -24,7 +24,7 @@ Parameters:
     Description: S3 Bucket Name for deployment
 
 # ------------------------------------------------------------#
-# IAM Role
+# IAM Role Codepipelineが使用するロールの定義
 # ------------------------------------------------------------#
 Resources:
   CodePipelineRole:
@@ -56,7 +56,9 @@ Resources:
                   - codebuild:BatchGetBuilds
                   - codebuild:BatchGetProjects
                 Resource: "*"
-
+# ------------------------------------------------------------#
+# IAM Role CodeBuildが使用するロールの定義
+# ------------------------------------------------------------#
   CodeBuildRole:
     Type: AWS::IAM::Role
     Properties:
