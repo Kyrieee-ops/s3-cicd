@@ -23,3 +23,22 @@ https://github.com/settings/tokens
 
 Repository accessはセキュリティを考慮して`Only select repositories`を選択し、特定のリポジトリのみアクセスが必要な場合を選択します。
 ![Repository access](./img/Repository%20access.png)
+
+Codepipelineと連携するリポジトリを選択します。
+![Select Repository](./img/Select%20Repository.png)
+
+Permissionsで権限設定をします。
+今回の要件はCode PipelineとGitHubを連携し、GitHubへ資材をPushをトリガーに、Code Buildを実行 -> S3へ資材を格納することです。
+今回は`Contens`を`Read and write`に変更しました。 (必要に応じてPull requestsやActionsなども読み書きに変更しておくと良いかと思います)
+![Permissions](./img/Permissions.png)
+
+`Generated token`ボタンをクリックすると`access token`が発行されます。
+![access token](./img/access%20token.png)
+
+トークンのPermissionsなどを編集したい場合などは対象のトークン名をクリックします。
+![token edit](./img/token%20edit.png)
+
+`edit`から内容を編集することが可能です。
+![edit page](./img/edit%20page.png)
+
+発行した`access token`は大事に保管しておきましょう。
