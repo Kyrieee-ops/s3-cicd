@@ -45,11 +45,14 @@ StringParameters:
     Type: String
     Default: ''
 
+# TemplateConfigurationの値はデフォルトでは`空`と定義している
+# ParameterOverridesの値はデフォルトでは`空`と定義している
+# 
 Conditions:
   HasTemplateConfiguration: !Not [!Equals ['', !Ref TemplateConfiguration]]
   HasParameterOverrides: !Not [!Equals ['', !Ref ParameterOverrides]]
 # ------------------------------------------------------------#
-# Code Pipeline
+# CodePipeline
 # ------------------------------------------------------------#
 Resources:
   CodePipeline:
@@ -78,7 +81,8 @@ Resources:
               OutputArtifacts:
                 - Name: SourceOutput # ソースステージの出力 -> 指定されたリポジトリからコードを取得しそれをSourceOutputという名前で出力アーティファクトとして生成する
               RoleArn: !GetAtt CodePipelineSourceActionRole.Arn
-              RunOrder: 1
+              RunOrder: 1 
+
         - Name: Deploy
           Actions:
             - Name: CloudFormation
@@ -94,6 +98,7 @@ Resources:
                 TemplatePath: !Sub SourceOutput::${TemplatePath}
                 RoleArn: !GetAtt CloudFormationRole.Arn
                 OutputFileName: !Ref OutputFileName
+                # HasTemplateConfigurationの値がtrueの場合は`SourceOutput`の値が適用され、falseの場合は`AWS::NoValue`でTemplateConfigurationがスキップされる
                 TemplateConfiguration:
                   !If [HasTemplateConfiguration, !Sub "SourceOutput::${TemplateConfiguration}", !Ref "AWS::NoValue"]
                 ParameterOverrides:
