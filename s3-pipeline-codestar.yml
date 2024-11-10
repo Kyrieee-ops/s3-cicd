@@ -114,26 +114,30 @@ Resources:
                 - Name: DeployOutput
               RoleArn: !GetAtt CodePipelineDeployActionRole.Arn
               RunOrder: 1
-          OnFailure:
-            Result: ROLLBACK # デプロイ失敗時、ロールバックを実行する
-          BeforeEntry:
-            Conditions:
-              - Result: FAIL
-                Rules:
-                  - Name: MyDeploymentWindowRule
-                    RuleTypeId:
-                      Category: Rule
-                      Owner: AWS
-                      Provider: DeploymentWindow
-                      Version: '1'
-                    Configuration:
-                      Cron: '* * * * * ? *'
-                      TimeZone: 'PST'
+          # OnFailure:
+          #   Result: ROLLBACK # デプロイ失敗時、ロールバックを実行する
+          # デプロイに失敗した場合以下BeforeEntoryに記述されている内容を実施する
+          # デプロイ失敗を示すコードが`Result: FAIL`
+          # つまり以下でやっている内容はデプロイステージが失敗した場合に、Cronで指定した時間帯に再デプロイを試行する設定
+          # BeforeEntry:
+          #   Conditions:
+          #     - Result: FAIL
+          #       Rules:
+          #         - Name: MyDeploymentWindowRule 
+          #           RuleTypeId:
+          #             Category: Rule
+          #             Owner: AWS
+          #             Provider: DeploymentWindow
+          #             Version: '1'
+          #           Configuration:
+          #             Cron: '* * * * * ? *'
+          #             TimeZone: 'PST'
     DependsOn:
       - CodePipelineRoleDefaultPolicy
       - CodePipelineRole
 # ------------------------------------------------------------#
-# CodePipelineのロールを指定する
+# CodePipelineが使用するロールを指定する
+# CodePipelineが必要とするS3およびAssumeRoleの権限を持つ
 # CloudFormationでロール名を指定しない場合、スタック名 + 論理ID + ランダムな文字列で生成する
 # ------------------------------------------------------------#  
 CodePipelineRole:
@@ -152,7 +156,7 @@ CodePipelineRole:
     Properties:
       PolicyDocument:
         Statement:
-          - Action:
+          - Action: # CodePipelineが指定のS3バケットに対して操作を行えるようにしている
               - s3:Abort*
               - s3:DeleteObject*
               - s3:GetBucket*
@@ -164,6 +168,10 @@ CodePipelineRole:
               - s3:PutObjectTagging
               - s3:PutObjectVersionTagging
             Effect: Allow
+            # 以下ではS3バケットレベルの操作とオブジェクトレベルの操作を許可するために指定している
+            # `!GetAtt CodePipelineArtifactsBucket.Arn`でS3バケットを指定
+            # `Join`でS3バケットに`/*`のように結合し、`arn:aws:s3:::my-bucket/*`を指定
+            # つまり対象のS3バケットの全てのオブジェクトに対して許可をする、ということを示している
             Resource:
               - !GetAtt CodePipelineArtifactsBucket.Arn
               - !Join
