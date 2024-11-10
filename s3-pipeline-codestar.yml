@@ -18,9 +18,14 @@ StringParameters:
     Description: The CloudFormation stack name that you want to create or update.
     Type: String
     default: s3-cicd-stack
+  # CloudFormationテンプレートが格納されているPathのパラメータ値
+  # CodePipelineがどこからCloudFormationテンプレートを取得するのかの場所を特定するために使用する
+  # GitHubリポジトリ上に存在する場合にはリポジトリパス/ファイル名のような形で指定する
+  # リポジトリのフルパスについてはFullRepositoryIdに含まれるため相対パスのみでOK
   TemplatePath:
     Description: The path in your source repository to the CloudFormation template file to create or update your stack.
     Type: String
+    default: "s3-cicd/s3-pipeline-codestar.yml"
   OutputFileName:
     Description: The path the output from the CloudFormation stack update will be written to.
     Type: String
@@ -95,7 +100,7 @@ Resources:
                 ActionMode: CREATE_UPDATE
                 Capabilities: CAPABILITY_IAM,CAPABILITY_AUTO_EXPAND,CAPABILITY_NAMED_IAM
                 StackName: !Ref StackName
-                TemplatePath: !Sub SourceOutput::${TemplatePath}
+                TemplatePath: !Sub SourceOutput::${TemplatePath} #GitHubリポジトリの
                 RoleArn: !GetAtt CloudFormationRole.Arn
                 OutputFileName: !Ref OutputFileName
                 # HasTemplateConfigurationの値がtrueの場合は`SourceOutput`の値が適用され、falseの場合は`AWS::NoValue`でTemplateConfigurationがスキップされる
@@ -110,7 +115,7 @@ Resources:
               RoleArn: !GetAtt CodePipelineDeployActionRole.Arn
               RunOrder: 1
           OnFailure:
-            Result: ROLLBACK
+            Result: ROLLBACK # デプロイ失敗時、ロールバックを実行する
           BeforeEntry:
             Conditions:
               - Result: FAIL
