@@ -97,6 +97,11 @@ Outputs:
     Export: 
       Name: s3bucketbackup
 
+  # s3BucketPolicyBackup:
+  #   Value: !Ref s3BucketPolicyBackup
+  #   Export:
+  #     Name: s3BucketPolicyBackup
+
   s3BucketPolicyProd:
     Value: !Ref s3bucketprod
     Export:

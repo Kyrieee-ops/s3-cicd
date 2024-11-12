@@ -1,15 +1,16 @@
-StringParameters:
+Parameters:
   ConnectionArn:
     Description: The CodeConnections ARN for your source repository.
     Type: String
+    Default: "arn:aws:codeconnections:ap-northeast-1:674078804300:connection/daf5ec94-493c-4804-8a9b-e098942afffb"
   FullRepositoryId:
     Description: The full repository ID to use with your CodeConnections connection.
     Type: String
-    default: "Kyrieee-ops/s3-cicd"
+    Default: "Kyrieee-ops/s3-cicd"
   BranchName:
     Description: The branch name to use with your CodeConnections connection.
     Type: String
-    default: main
+    Default: main
   CodePipelineName:
     Description: The CodePipeline pipeline name that will deploy to your CloudFormation stack.
     Type: String
@@ -17,7 +18,7 @@ StringParameters:
   StackName:
     Description: The CloudFormation stack name that you want to create or update.
     Type: String
-    default: s3-cicd-stack
+    Default: s3-cicd-stack
   # CloudFormationテンプレートが格納されているPathのパラメータ値
   # CodePipelineがどこからCloudFormationテンプレートを取得するのかの場所を特定するために使用する
   # GitHubリポジトリ上に存在する場合にはリポジトリパス/ファイル名のような形で指定する
@@ -25,7 +26,7 @@ StringParameters:
   TemplatePath:
     Description: The path in your source repository to the CloudFormation template file to create or update your stack.
     Type: String
-    default: "s3-cicd/s3-pipeline-codestar.yml"
+    Default: "s3-cicd/s3-pipeline-codestar.yml"
   OutputFileName:
     Description: The path the output from the CloudFormation stack update will be written to.
     Type: String
@@ -33,11 +34,11 @@ StringParameters:
   CloudFormationResourcePermissions:
     Description: The permission required by CloudFormation to make resource calls on your behalf.
     Type: String
-  RetentionPolicy:
-    Description: Define if you'd like the resource retained or deleted when the
-      CloudFormation stack is deleted.
-    Type: String
-    Default: Delete
+  # RetentionPolicy:
+  #   Description: Define if you'd like the resource retained or deleted when the
+  #     CloudFormation stack is deleted.
+  #   Type: String
+  #   Default: Delete
     AllowedValues:
       - Delete
       - Retain
@@ -66,9 +67,9 @@ Resources:
       ArtifactStore:
         Location: !ImportValue s3bucketbackup
         Type: S3
-      ExecutionMode: QUEUED # Code Pipelineが実行中であっても並列実行を制御するためにキューに入る設定
+      # ExecutionMode: PARALLEL # Code Pipelineが実行中であっても並列実行を制御するためにキューに入る設定
       Name: !Ref CodePipelineName
-      PipelineType: V2
+      # PipelineType: V2
       RoleArn: !GetAtt CodePipelineRole.Arn
       Stages:
         - Name: Source
@@ -140,7 +141,7 @@ Resources:
 # CodePipelineが必要とするS3およびAssumeRoleの権限を持つ
 # CloudFormationでロール名を指定しない場合、スタック名 + 論理ID + ランダムな文字列で生成する
 # ------------------------------------------------------------#  
-CodePipelineRole:
+  CodePipelineRole:
     Type: AWS::IAM::Role
     Properties:
       RoleName: s3-cicd-role
@@ -173,10 +174,10 @@ CodePipelineRole:
             # `Join`でS3バケットに`/*`のように結合し、`arn:aws:s3:::my-bucket/*`を指定
             # つまり対象のS3バケットの全てのオブジェクトに対して許可をする、ということを示している
             Resource:
-              - !GetAtt CodePipelineArtifactsBucket.Arn
+              - !ImportValue s3bucketbackup # s3バケットリソースの論理名でs3バケットのARNを取得する
               - !Join
                 - '/'
-                - - !GetAtt CodePipelineArtifactsBucket.Arn
+                - - !ImportValue s3bucketbackup
                   - '*'
           - Action:
               - s3:PutObjectAcl
@@ -184,7 +185,7 @@ CodePipelineRole:
             Effect: Allow
             Resource: !Join
               - /
-              - - !GetAtt CodePipelineArtifactsBucket.Arn
+              - - !ImportValue s3bucketbackup
                 - '*'
           - Action: sts:AssumeRole
             Effect: Allow
@@ -223,10 +224,10 @@ CodePipelineRole:
               - s3:PutObjectVersionTagging
             Effect: Allow
             Resource:
-              - !GetAtt CodePipelineArtifactsBucket.Arn
+              - !ImportValue s3bucketbackup
               - !Join
                 - '/'
-                - - !GetAtt CodePipelineArtifactsBucket.Arn
+                - - !ImportValue s3bucketbackup
                   - '*'
           - Action:
               - s3:PutObjectAcl
@@ -234,7 +235,7 @@ CodePipelineRole:
             Effect: Allow
             Resource: !Join
               - /
-              - - !GetAtt CodePipelineArtifactsBucket.Arn
+              - - !ImportValue s3bucketbackup
                 - '*'
         Version: '2012-10-17'
       PolicyName: CodePipelineSourceActionRoleDefaultPolicy
@@ -277,10 +278,10 @@ CodePipelineRole:
               - s3:PutObjectVersionTagging
             Effect: Allow
             Resource:
-              - !GetAtt CodePipelineArtifactsBucket.Arn
+              - !ImportValue s3bucketbackup
               - !Join
                 - '/'
-                - - !GetAtt CodePipelineArtifactsBucket.Arn
+                - - !ImportValue s3bucketbackup
                   - '*'
           - Action:
               - s3:PutObjectAcl
@@ -288,7 +289,7 @@ CodePipelineRole:
             Effect: Allow
             Resource: !Join
               - /
-              - - !GetAtt CodePipelineArtifactsBucket.Arn
+              - - !ImportValue s3bucketbackup
                 - '*'
         Version: '2012-10-17'
       PolicyName: CodePipelineDeployActionRoleDefaultPolicy
@@ -331,10 +332,10 @@ CodePipelineRole:
               - s3:PutObjectVersionTagging
             Effect: Allow
             Resource:
-              - !GetAtt CodePipelineArtifactsBucket.Arn
+              - !ImportValue s3bucketbackup
               - !Join
                 - '/'
-                - - !GetAtt CodePipelineArtifactsBucket.Arn
+                - - !ImportValue s3bucketbackup
                   - '*'
           - Action:
               - s3:PutObjectAcl
@@ -342,7 +343,7 @@ CodePipelineRole:
             Effect: Allow
             Resource: !Join
               - /
-              - - !GetAtt CodePipelineArtifactsBucket.Arn
+              - - !ImportValue s3bucketbackup
                 - '*'
         Version: '2012-10-17'
       PolicyName: CloudFormationDefaultPolicy
@@ -370,12 +371,12 @@ CodePipelineRole:
         BlockPublicPolicy: true
         IgnorePublicAcls: true
         RestrictPublicBuckets: true
-    UpdateReplacePolicy: !Ref RetentionPolicy
-    DeletionPolicy: !Ref RetentionPolicy
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
   CodePipelineArtifactsBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: !Ref CodePipelineArtifactsBucket
+      Bucket: !ImportValue s3bucketbackup
       PolicyDocument:
         Statement:
           - Action: s3:*
@@ -386,9 +387,9 @@ CodePipelineRole:
             Principal:
               AWS: '*'
             Resource:
-              - !GetAtt CodePipelineArtifactsBucket.Arn
+              - !ImportValue s3bucketbackup
               - !Join
                 - '/'
-                - - !GetAtt CodePipelineArtifactsBucket.Arn
+                - - !ImportValue s3bucketbackup
                   - '*'
         Version: '2012-10-17'

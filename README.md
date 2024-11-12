@@ -5,6 +5,13 @@ aws cloudformation deploy \
 --capabilities CAPABILITY_NAMED_IAM \
 --profile Administrator
 
+# s3-pipeline-codestar deploy command
+aws cloudformation deploy \
+--stack-name s3-pipeline-codestar-stack \
+--template-file s3-pipeline-codestar-stack.yml \
+--capabilities CAPABILITY_NAMED_IAM \
+--profile Administrator
+
 
 # GitHub OAuthトークンを発行する
 以下`GitHub Developers Settings`のページにてトークンを発行する
