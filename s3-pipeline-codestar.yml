@@ -34,6 +34,7 @@ Parameters:
   CloudFormationResourcePermissions:
     Description: The permission required by CloudFormation to make resource calls on your behalf.
     Type: String
+
   # RetentionPolicy:
   #   Description: Define if you'd like the resource retained or deleted when the
   #     CloudFormation stack is deleted.
@@ -141,7 +142,7 @@ Resources:
 # CodePipelineが必要とするS3およびAssumeRoleの権限を持つ
 # CloudFormationでロール名を指定しない場合、スタック名 + 論理ID + ランダムな文字列で生成する
 # ------------------------------------------------------------#  
-  CodePipelineRole:
+  CodePipelineRole: #ok
     Type: AWS::IAM::Role
     Properties:
       RoleName: s3-cicd-role
@@ -174,18 +175,19 @@ Resources:
             # `Join`でS3バケットに`/*`のように結合し、`arn:aws:s3:::my-bucket/*`を指定
             # つまり対象のS3バケットの全てのオブジェクトに対して許可をする、ということを示している
             Resource:
-              - !ImportValue s3bucketbackup # s3バケットリソースの論理名でs3バケットのARNを取得する
+              - !ImportValue s3bucketbackupArn # s3バケットリソースの論理名でs3バケットのARNを取得する
               - !Join
                 - '/'
-                - - !ImportValue s3bucketbackup
+                - - !ImportValue s3bucketbackupArn
                   - '*'
+              
           - Action:
               - s3:PutObjectAcl
               - s3:PutObjectVersionAcl
             Effect: Allow
             Resource: !Join
               - /
-              - - !ImportValue s3bucketbackup
+              - - !ImportValue s3bucketbackupArn
                 - '*'
           - Action: sts:AssumeRole
             Effect: Allow
@@ -196,7 +198,7 @@ Resources:
       PolicyName: CodePipelineRoleDefaultPolicy
       Roles:
         - !Ref CodePipelineRole
-  CodePipelineSourceActionRole:
+  CodePipelineSourceActionRole: #ok
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -224,10 +226,10 @@ Resources:
               - s3:PutObjectVersionTagging
             Effect: Allow
             Resource:
-              - !ImportValue s3bucketbackup
+              - !ImportValue s3bucketbackupArn
               - !Join
                 - '/'
-                - - !ImportValue s3bucketbackup
+                - - !ImportValue s3bucketbackupArn
                   - '*'
           - Action:
               - s3:PutObjectAcl
@@ -235,13 +237,13 @@ Resources:
             Effect: Allow
             Resource: !Join
               - /
-              - - !ImportValue s3bucketbackup
+              - - !ImportValue s3bucketbackupArn
                 - '*'
         Version: '2012-10-17'
       PolicyName: CodePipelineSourceActionRoleDefaultPolicy
       Roles:
         - !Ref CodePipelineSourceActionRole
-  CodePipelineDeployActionRole:
+  CodePipelineDeployActionRole: #ok
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -278,10 +280,10 @@ Resources:
               - s3:PutObjectVersionTagging
             Effect: Allow
             Resource:
-              - !ImportValue s3bucketbackup
+              - !ImportValue s3bucketbackupArn
               - !Join
                 - '/'
-                - - !ImportValue s3bucketbackup
+                - - !ImportValue s3bucketbackupArn
                   - '*'
           - Action:
               - s3:PutObjectAcl
@@ -289,13 +291,13 @@ Resources:
             Effect: Allow
             Resource: !Join
               - /
-              - - !ImportValue s3bucketbackup
+              - - !ImportValue s3bucketbackupArn
                 - '*'
         Version: '2012-10-17'
       PolicyName: CodePipelineDeployActionRoleDefaultPolicy
       Roles:
         - !Ref CodePipelineDeployActionRole
-  CloudFormationRole:
+  CloudFormationRole: #ok
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -332,10 +334,10 @@ Resources:
               - s3:PutObjectVersionTagging
             Effect: Allow
             Resource:
-              - !ImportValue s3bucketbackup
+              - !ImportValue s3bucketbackupArn
               - !Join
                 - '/'
-                - - !ImportValue s3bucketbackup
+                - - !ImportValue s3bucketbackupArn
                   - '*'
           - Action:
               - s3:PutObjectAcl
@@ -343,13 +345,13 @@ Resources:
             Effect: Allow
             Resource: !Join
               - /
-              - - !ImportValue s3bucketbackup
+              - - !ImportValue s3bucketbackupArn
                 - '*'
         Version: '2012-10-17'
       PolicyName: CloudFormationDefaultPolicy
       Roles:
         - !Ref CloudFormationRole
-  CloudFormationRoleResourceCreationPolicy:
+  CloudFormationRoleResourceCreationPolicy: #NG
     Type: AWS::IAM::Policy
     Properties:
       PolicyDocument: !Ref CloudFormationResourcePermissions
@@ -387,9 +389,9 @@ Resources:
             Principal:
               AWS: '*'
             Resource:
-              - !ImportValue s3bucketbackup
+              - !ImportValue s3bucketbackupArn
               - !Join
                 - '/'
-                - - !ImportValue s3bucketbackup
+                - - !ImportValue s3bucketbackupArn
                   - '*'
         Version: '2012-10-17'
