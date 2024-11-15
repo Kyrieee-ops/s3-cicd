@@ -15,10 +15,10 @@ Parameters:
     Description: The CodePipeline pipeline name that will deploy to your CloudFormation stack.
     Type: String
     Default: s3-codepipeline
-  StackName:
-    Description: The CloudFormation stack name that you want to create or update.
-    Type: String
-    Default: s3-cicd-stack
+  # StackName:
+  #   Description: The CloudFormation stack name that you want to create or update.
+  #   Type: String
+  #   Default: s3-cicd-stack
   # CloudFormationテンプレートが格納されているPathのパラメータ値
   # CodePipelineがどこからCloudFormationテンプレートを取得するのかの場所を特定するために使用する
   # GitHubリポジトリ上に存在する場合にはリポジトリパス/ファイル名のような形で指定する
@@ -215,7 +215,7 @@ Resources:
       - CodePipelineRole
 # ------------------------------------------------------------#
 # CodePipelineが使用するロールを指定する
-# CodePipelineが必要とするS3およびAssumeRoleの権限を持つ
+# codepipelineに対してAssumeRole -> 要するにCodePipelineが権限を引き受けることができる
 # CloudFormationでロール名を指定しない場合、スタック名 + 論理ID + ランダムな文字列で生成する
 # ------------------------------------------------------------#  
   CodePipelineRole: 
@@ -229,6 +229,10 @@ Resources:
             Principal:
               Service: codepipeline.amazonaws.com
         Version: '2012-10-17'
+# ------------------------------------------------------------#
+# CodePipelineRoleにアタッチするポリシー
+# CodePipelineが指定のS3バケットに対する操作を行うことができる
+# ------------------------------------------------------------#
   CodePipelineRoleDefaultPolicy:
     Type: AWS::IAM::Policy
     Properties:
@@ -247,7 +251,6 @@ Resources:
               - s3:PutObjectVersionTagging
             Effect: Allow
             # 以下ではS3バケットレベルの操作とオブジェクトレベルの操作を許可するために指定している
-            # `!GetAtt CodePipelineArtifactsBucket.Arn`でS3バケットを指定
             # `Join`でS3バケットに`/*`のように結合し、`arn:aws:s3:::my-bucket/*`を指定
             # つまり対象のS3バケットの全てのオブジェクトに対して許可をする、ということを示している
             Resource:
@@ -256,7 +259,7 @@ Resources:
                 - '/'
                 - - !ImportValue s3bucketbackupArn
                   - '*'
-              
+          # S3バケットのACL操作の許可
           - Action:
               - s3:PutObjectAcl
               - s3:PutObjectVersionAcl
@@ -265,15 +268,26 @@ Resources:
               - /
               - - !ImportValue s3bucketbackupArn
                 - '*'
-          - Action: sts:AssumeRole
+          - Action: sts:AssumeRole # あくまでCodePipelineがCodeBuildプロジェクトのロールを引き受ける許可
             Effect: Allow
             Resource:
-              - !GetAtt CodePipelineSourceActionRole.Arn
-              - !GetAtt CodePipelineDeployActionRole.Arn
+              - !GetAtt CodePipelineSourceActionRole.Arn # CodePipelineがGitHubからコード取得を実行する際にCodePipelineSourceActionRoleを引き受ける
+              # - !GetAtt CodePipelineDeployActionRole.Arn
+              - !GetAtt CodeBuildProject.Arn
+          - Action: # CodeBuildプロジェクトを開始する権限を追加
+              - codebuild:StartBuild
+              - codebuild:BatchGetBuilds
+            Effect: Allow
+            Resource: !GetAtt CodeBuildProject.Arn
         Version: '2012-10-17'
       PolicyName: CodePipelineRoleDefaultPolicy
       Roles:
         - !Ref CodePipelineRole
+
+# ------------------------------------------------------------#
+# CodePipelineのソースアクションに必要なロールを定義
+# GitHubからコードを取得するアクション
+# ------------------------------------------------------------#
   CodePipelineSourceActionRole: 
     Type: AWS::IAM::Role
     Properties:
@@ -282,24 +296,29 @@ Resources:
           - Action: sts:AssumeRole
             Effect: Allow
             Principal:
-              AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:root
+              AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:root # 使用しているAWSアカウントに対して権限を引き受けることができる
         Version: '2012-10-17'
+# ------------------------------------------------------------#
+# ソースアクション(コードを取得するアクション)が必要とする権限を定義する
+# 
+# ------------------------------------------------------------#
   CodePipelineSourceActionRoleDefaultPolicy:
     Type: AWS::IAM::Policy
     Properties:
       PolicyDocument:
         Statement:
-          - Action: codestar-connections:UseConnection
+          - Action: codestar-connections:UseConnection # CodePipelineがGitHubのソースプロバイダーに接続し、GitHubからソースを取得する
             Effect: Allow
-            Resource: !Ref ConnectionArn
+            Resource: !Ref ConnectionArn # AWS ⇔ GitHub接続名のARNを参照し、GitHubとの接続を使用してコードを取得が可能となる
+          # CodePipelineがGitHubから取得したファイルをS3へアップロードするために必要なActionの操作権限を定義
           - Action:
               - s3:Abort*
               - s3:DeleteObject*
               - s3:PutObject
-              - s3:PutObjectLegalHold
+              - s3:PutObjectLegalHold # 必要に応じてオブジェクトの保持ポリシーを設定する場合に必要
               - s3:PutObjectRetention
               - s3:PutObjectTagging
-              - s3:PutObjectVersionTagging
+              - s3:PutObjectVersionTagging # アップロードしたファイルにタグを付与する場合に必要
             Effect: Allow
             Resource:
               - !ImportValue s3bucketbackupArn
@@ -319,127 +338,127 @@ Resources:
       PolicyName: CodePipelineSourceActionRoleDefaultPolicy
       Roles:
         - !Ref CodePipelineSourceActionRole
-  CodePipelineDeployActionRole: 
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          - Action: sts:AssumeRole
-            Effect: Allow
-            Principal:
-              AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:root
-        Version: '2012-10-17'
-  CodePipelineDeployActionRoleDefaultPolicy:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyDocument:
-        Statement:
-          - Action:
-              - cloudformation:*
-            Effect: Allow
-            Resource: '*'
-          - Action: iam:PassRole
-            Condition:
-              StringEqualsIfExists:
-                iam:PassedToService:
-                  - cloudformation.amazonaws.com
-            Effect: Allow
-            Resource: '*'
-          - Action:
-              - s3:GetBucket*
-              - s3:GetObject*
-              - s3:List*
-              - s3:PutObject
-              - s3:PutObjectLegalHold
-              - s3:PutObjectRetention
-              - s3:PutObjectTagging
-              - s3:PutObjectVersionTagging
-            Effect: Allow
-            Resource:
-              - !ImportValue s3bucketbackupArn
-              - !Join
-                - '/'
-                - - !ImportValue s3bucketbackupArn
-                  - '*'
-          - Action:
-              - s3:PutObjectAcl
-              - s3:PutObjectVersionAcl
-            Effect: Allow
-            Resource: !Join
-              - /
-              - - !ImportValue s3bucketbackupArn
-                - '*'
-        Version: '2012-10-17'
-      PolicyName: CodePipelineDeployActionRoleDefaultPolicy
-      Roles:
-        - !Ref CodePipelineDeployActionRole
-  CloudFormationRole: 
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Statement:
-          - Action: sts:AssumeRole
-            Effect: Allow
-            Principal:
-              Service:
-                - cloudformation.amazonaws.com
-                - codepipeline.amazonaws.com
-        Version: '2012-10-17'
-  CloudFormationRoleDefaultPolicy:
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyDocument:
-        Statement:
-          - Action:
-              - cloudformation:*
-            Effect: Allow
-            Resource:
-              - !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${StackName}
-          - Action: sts:AssumeRole
-            Effect: Allow
-            Resource:
-              - !GetAtt CodePipelineRole.Arn
-          - Action:
-              - s3:GetBucket*
-              - s3:GetObject*
-              - s3:List*
-              - s3:PutObject
-              - s3:PutObjectLegalHold
-              - s3:PutObjectRetention
-              - s3:PutObjectTagging
-              - s3:PutObjectVersionTagging
-            Effect: Allow
-            Resource:
-              - !ImportValue s3bucketbackupArn
-              - !Join
-                - '/'
-                - - !ImportValue s3bucketbackupArn
-                  - '*'
-          - Action:
-              - s3:PutObjectAcl
-              - s3:PutObjectVersionAcl
-            Effect: Allow
-            Resource: !Join
-              - /
-              - - !ImportValue s3bucketbackupArn
-                - '*'
-        Version: '2012-10-17'
-      PolicyName: CloudFormationDefaultPolicy
-      Roles:
-        - !Ref CloudFormationRole
-  CloudFormationRoleResourceCreationPolicy: 
-    Type: AWS::IAM::Policy
-    Properties:
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Action:
-              - cloudformation:*
-            Resource: '*'
-      PolicyName: CloudFormationResourceCreationPolicy
-      Roles:
-        - !Ref CloudFormationRole
+  # CodePipelineDeployActionRole: 
+  #   Type: AWS::IAM::Role
+  #   Properties:
+  #     AssumeRolePolicyDocument:
+  #       Statement:
+  #         - Action: sts:AssumeRole
+  #           Effect: Allow
+  #           Principal:
+  #             AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:root
+  #       Version: '2012-10-17'
+  # CodePipelineDeployActionRoleDefaultPolicy:
+  #   Type: AWS::IAM::Policy
+  #   Properties:
+  #     PolicyDocument:
+  #       Statement:
+  #         - Action:
+  #             - cloudformation:*
+  #           Effect: Allow
+  #           Resource: '*'
+  #         - Action: iam:PassRole
+  #           Condition:
+  #             StringEqualsIfExists:
+  #               iam:PassedToService:
+  #                 - cloudformation.amazonaws.com
+  #           Effect: Allow
+  #           Resource: '*'
+  #         - Action:
+  #             - s3:GetBucket*
+  #             - s3:GetObject*
+  #             - s3:List*
+  #             - s3:PutObject
+  #             - s3:PutObjectLegalHold
+  #             - s3:PutObjectRetention
+  #             - s3:PutObjectTagging
+  #             - s3:PutObjectVersionTagging
+  #           Effect: Allow
+  #           Resource:
+  #             - !ImportValue s3bucketbackupArn
+  #             - !Join
+  #               - '/'
+  #               - - !ImportValue s3bucketbackupArn
+  #                 - '*'
+  #         - Action:
+  #             - s3:PutObjectAcl
+  #             - s3:PutObjectVersionAcl
+  #           Effect: Allow
+  #           Resource: !Join
+  #             - /
+  #             - - !ImportValue s3bucketbackupArn
+  #               - '*'
+  #       Version: '2012-10-17'
+  #     PolicyName: CodePipelineDeployActionRoleDefaultPolicy
+  #     Roles:
+  #       - !Ref CodePipelineDeployActionRole
+  # CloudFormationRole: 
+  #   Type: AWS::IAM::Role
+  #   Properties:
+  #     AssumeRolePolicyDocument:
+  #       Statement:
+  #         - Action: sts:AssumeRole
+  #           Effect: Allow
+  #           Principal:
+  #             Service:
+  #               - cloudformation.amazonaws.com
+  #               - codepipeline.amazonaws.com
+  #       Version: '2012-10-17'
+  # CloudFormationRoleDefaultPolicy:
+  #   Type: AWS::IAM::Policy
+  #   Properties:
+  #     PolicyDocument:
+  #       Statement:
+  #         - Action:
+  #             - cloudformation:*
+  #           Effect: Allow
+  #           Resource:
+  #             - !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${StackName}
+  #         - Action: sts:AssumeRole
+  #           Effect: Allow
+  #           Resource:
+  #             - !GetAtt CodePipelineRole.Arn
+  #         - Action:
+  #             - s3:GetBucket*
+  #             - s3:GetObject*
+  #             - s3:List*
+  #             - s3:PutObject
+  #             - s3:PutObjectLegalHold
+  #             - s3:PutObjectRetention
+  #             - s3:PutObjectTagging
+  #             - s3:PutObjectVersionTagging
+  #           Effect: Allow
+  #           Resource:
+  #             - !ImportValue s3bucketbackupArn
+  #             - !Join
+  #               - '/'
+  #               - - !ImportValue s3bucketbackupArn
+  #                 - '*'
+  #         - Action:
+  #             - s3:PutObjectAcl
+  #             - s3:PutObjectVersionAcl
+  #           Effect: Allow
+  #           Resource: !Join
+  #             - /
+  #             - - !ImportValue s3bucketbackupArn
+  #               - '*'
+  #       Version: '2012-10-17'
+  #     PolicyName: CloudFormationDefaultPolicy
+  #     Roles:
+  #       - !Ref CloudFormationRole
+  # CloudFormationRoleResourceCreationPolicy: 
+  #   Type: AWS::IAM::Policy
+  #   Properties:
+  #     PolicyDocument:
+  #       Version: '2012-10-17'
+  #       Statement:
+  #         - Effect: Allow
+  #           Action:
+  #             - cloudformation:*
+  #           Resource: '*'
+  #     PolicyName: CloudFormationResourceCreationPolicy
+  #     Roles:
+  #       - !Ref CloudFormationRole
 # ------------------------------------------------------------#
 # S3Bucket
 # ------------------------------------------------------------#  
