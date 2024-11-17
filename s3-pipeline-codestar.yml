@@ -15,54 +15,12 @@ Parameters:
     Description: The CodePipeline pipeline name that will deploy to your CloudFormation stack.
     Type: String
     Default: s3-codepipeline
-  # StackName:
-  #   Description: The CloudFormation stack name that you want to create or update.
-  #   Type: String
-  #   Default: s3-cicd-stack
-  # CloudFormationテンプレートが格納されているPathのパラメータ値
-  # CodePipelineがどこからCloudFormationテンプレートを取得するのかの場所を特定するために使用する
-  # GitHubリポジトリ上に存在する場合にはリポジトリパス/ファイル名のような形で指定する
-  # リポジトリのフルパスについてはFullRepositoryIdに含まれるため相対パスのみでOK
-  # TemplatePath:
-  #   Description: The path in your source repository to the CloudFormation template file to create or update your stack.
-  #   Type: String
-  #   Default: "s3-cicd/s3-pipeline-codestar.yml"
-  # OutputFileName:
-  #   Description: The path the output from the CloudFormation stack update will be written to.
-  #   Type: String
-  #   Default: output.json
-  # CloudFormationResourcePermissions:
-  #   Description: The permission required by CloudFormation to make resource calls on your behalf.
-  #   Type: String
-
-  # RetentionPolicy:
-  #   Description: Define if you'd like the resource retained or deleted when the
-  #     CloudFormation stack is deleted.
-  #   Type: String
-  #   Default: Delete
-  #   AllowedValues:
-  #     - Delete
-  #     - Retain
-  # TemplateConfiguration:
-  #   Description: The path to a template configuration file containing parameter values and stack policy for creating or updating your stack.
-  #   Type: String
-  #   Default: ''
-  # ParameterOverrides:
-  #   Description: A JSON string to provide parameter values that override defaults in the template or TemplateConfiguration file.
-  #   Type: String
-  #   Default: ''
-
-# TemplateConfigurationの値はデフォルトでは`空`と定義している
-# ParameterOverridesの値はデフォルトでは`空`と定義している
-# 
-# Conditions:
-#   HasTemplateConfiguration: !Not [!Equals ['', !Ref TemplateConfiguration]]
-#   HasParameterOverrides: !Not [!Equals ['', !Ref ParameterOverrides]]
 
 
 Resources:
 # ------------------------------------------------------------#
 # CodeBuild
+# Name: GitHubToS3Build
 # ------------------------------------------------------------#
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
@@ -123,16 +81,11 @@ Resources:
           - Action:
               - codebuild:StartBuild
               - codebuild:BatchGetBuilds
-              - logs:CreateLogGroup
-              - logs:CreateLogStream
-              - logs:PutLogEvents
               - s3:PutObject
               - s3:GetObject
             Effect: Allow
             Resource: 
               - !GetAtt CodeBuildProject.Arn
-              - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${CodeBuildProject}:*"
-              - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/codebuild/${CodeBuildProject}:log-stream:*"
               - !ImportValue s3bucketbackupArn # s3バケットリソースの論理名でs3バケットのARNを取得する
               - !Join
                 - '/'
@@ -187,52 +140,6 @@ Resources:
                 ProjectName: !Ref CodeBuildProject
               OutputArtifacts:
                 - Name: BuildOutput        
-        # - Name: Deploy
-        #   Actions:
-        #     - Name: CloudFormation # Deployアクションの名前
-        #       ActionTypeId:
-        #         Category: Deploy
-        #         Owner: AWS
-        #         Provider: CloudFormation # Deploy手段にCloudFormationを使用する
-        #         Version: '1'
-        #       Configuration:
-        #         ActionMode: CREATE_UPDATE #CloudFormationによるデプロイの具体的な設定 -> 既存スタックがあれば更新、なければ新規作成する
-        #         Capabilities: CAPABILITY_IAM,CAPABILITY_AUTO_EXPAND,CAPABILITY_NAMED_IAM # CAPABILITY_IAM: IAMリソースの作成/更新を許可, CAPABILITY_AUTO_EXPAND: テンプレートでネストされたスタックを含む場合に自動展開を許可, CAPABILITY_NAMED_IAM: 名前付きIAMリソースの作成/更新を許可
-        #         StackName: !Ref StackName
-        #         TemplatePath: !Sub SourceOutput::${TemplatePath} #GitHubリポジトリの
-        #         RoleArn: !GetAtt CloudFormationRole.Arn
-        #         OutputFileName: !Ref OutputFileName
-        #         # HasTemplateConfigurationの値がtrueの場合は`SourceOutput`の値が適用され、falseの場合は`AWS::NoValue`でTemplateConfigurationがスキップされる
-        #         TemplateConfiguration:
-        #           !If [HasTemplateConfiguration, !Sub "SourceOutput::${TemplateConfiguration}", !Ref "AWS::NoValue"]
-        #         ParameterOverrides:
-        #           !If [HasParameterOverrides, !Ref ParameterOverrides, !Ref "AWS::NoValue"]
-        #       InputArtifacts:
-        #         - Name: SourceOutput
-        #       OutputArtifacts:
-        #         - Name: DeployOutput
-        #       RoleArn: !GetAtt CodePipelineDeployActionRole.Arn
-        #       RunOrder: 1
-
-
-          # OnFailure:
-          #   Result: ROLLBACK # デプロイ失敗時、ロールバックを実行する
-          # デプロイに失敗した場合以下BeforeEntoryに記述されている内容を実施する
-          # デプロイ失敗を示すコードが`Result: FAIL`
-          # つまり以下でやっている内容はデプロイステージが失敗した場合に、Cronで指定した時間帯に再デプロイを試行する設定
-          # BeforeEntry:
-          #   Conditions:
-          #     - Result: FAIL
-          #       Rules:
-          #         - Name: MyDeploymentWindowRule 
-          #           RuleTypeId:
-          #             Category: Rule
-          #             Owner: AWS
-          #             Provider: DeploymentWindow
-          #             Version: '1'
-          #           Configuration:
-          #             Cron: '* * * * * ? *'
-          #             TimeZone: 'PST'
     DependsOn:
       - CodePipelineRoleDefaultPolicy
 # ------------------------------------------------------------#
@@ -284,6 +191,14 @@ Resources:
                 - '/'
                 - - !ImportValue s3bucketbackupArn
                   - '*'
+
+          - Action: 
+            - codebuild:StartBuild
+            - codebuild:BatchGetBuilds
+            - codebuild:BatchGetProjects
+            Effect: Allow
+            Resource: !GetAtt CodeBuildProject.Arn
+
           - Action: sts:AssumeRole # あくまでCodePipelineがCodeBuildプロジェクトのロールを引き受ける許可
             Effect: Allow
             Resource: 
@@ -348,163 +263,3 @@ Resources:
       PolicyName: CodePipelineSourceActionRoleDefaultPolicy
       Roles:
         - !Ref CodePipelineSourceActionRole
-
-
-  # CodePipelineDeployActionRole: 
-  #   Type: AWS::IAM::Role
-  #   Properties:
-  #     AssumeRolePolicyDocument:
-  #       Statement:
-  #         - Action: sts:AssumeRole
-  #           Effect: Allow
-  #           Principal:
-  #             AWS: !Sub arn:${AWS::Partition}:iam::${AWS::AccountId}:root
-  #       Version: '2012-10-17'
-  # CodePipelineDeployActionRoleDefaultPolicy:
-  #   Type: AWS::IAM::Policy
-  #   Properties:
-  #     PolicyDocument:
-  #       Statement:
-  #         - Action:
-  #             - cloudformation:*
-  #           Effect: Allow
-  #           Resource: '*'
-  #         - Action: iam:PassRole
-  #           Condition:
-  #             StringEqualsIfExists:
-  #               iam:PassedToService:
-  #                 - cloudformation.amazonaws.com
-  #           Effect: Allow
-  #           Resource: '*'
-  #         - Action:
-  #             - s3:GetBucket*
-  #             - s3:GetObject*
-  #             - s3:List*
-  #             - s3:PutObject
-  #             - s3:PutObjectLegalHold
-  #             - s3:PutObjectRetention
-  #             - s3:PutObjectTagging
-  #             - s3:PutObjectVersionTagging
-  #           Effect: Allow
-  #           Resource:
-  #             - !ImportValue s3bucketbackupArn
-  #             - !Join
-  #               - '/'
-  #               - - !ImportValue s3bucketbackupArn
-  #                 - '*'
-  #         - Action:
-  #             - s3:PutObjectAcl
-  #             - s3:PutObjectVersionAcl
-  #           Effect: Allow
-  #           Resource: !Join
-  #             - /
-  #             - - !ImportValue s3bucketbackupArn
-  #               - '*'
-  #       Version: '2012-10-17'
-  #     PolicyName: CodePipelineDeployActionRoleDefaultPolicy
-  #     Roles:
-  #       - !Ref CodePipelineDeployActionRole
-  # CloudFormationRole: 
-  #   Type: AWS::IAM::Role
-  #   Properties:
-  #     AssumeRolePolicyDocument:
-  #       Statement:
-  #         - Action: sts:AssumeRole
-  #           Effect: Allow
-  #           Principal:
-  #             Service:
-  #               - cloudformation.amazonaws.com
-  #               - codepipeline.amazonaws.com
-  #       Version: '2012-10-17'
-  # CloudFormationRoleDefaultPolicy:
-  #   Type: AWS::IAM::Policy
-  #   Properties:
-  #     PolicyDocument:
-  #       Statement:
-  #         - Action:
-  #             - cloudformation:*
-  #           Effect: Allow
-  #           Resource:
-  #             - !Sub arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/${StackName}
-  #         - Action: sts:AssumeRole
-  #           Effect: Allow
-  #           Resource:
-  #             - !GetAtt CodePipelineRole.Arn
-  #         - Action:
-  #             - s3:GetBucket*
-  #             - s3:GetObject*
-  #             - s3:List*
-  #             - s3:PutObject
-  #             - s3:PutObjectLegalHold
-  #             - s3:PutObjectRetention
-  #             - s3:PutObjectTagging
-  #             - s3:PutObjectVersionTagging
-  #           Effect: Allow
-  #           Resource:
-  #             - !ImportValue s3bucketbackupArn
-  #             - !Join
-  #               - '/'
-  #               - - !ImportValue s3bucketbackupArn
-  #                 - '*'
-  #         - Action:
-  #             - s3:PutObjectAcl
-  #             - s3:PutObjectVersionAcl
-  #           Effect: Allow
-  #           Resource: !Join
-  #             - /
-  #             - - !ImportValue s3bucketbackupArn
-  #               - '*'
-  #       Version: '2012-10-17'
-  #     PolicyName: CloudFormationDefaultPolicy
-  #     Roles:
-  #       - !Ref CloudFormationRole
-  # CloudFormationRoleResourceCreationPolicy: 
-  #   Type: AWS::IAM::Policy
-  #   Properties:
-  #     PolicyDocument:
-  #       Version: '2012-10-17'
-  #       Statement:
-  #         - Effect: Allow
-  #           Action:
-  #             - cloudformation:*
-  #           Resource: '*'
-  #     PolicyName: CloudFormationResourceCreationPolicy
-  #     Roles:
-  #       - !Ref CloudFormationRole
-# ------------------------------------------------------------#
-# S3Bucket
-# ------------------------------------------------------------#  
-  # CodePipelineArtifactsBucket:
-  #   Type: AWS::S3::Bucket
-  #   Properties:
-  #     BucketEncryption:
-  #       ServerSideEncryptionConfiguration:
-  #         - ServerSideEncryptionByDefault:
-  #             SSEAlgorithm: aws:kms
-  #     PublicAccessBlockConfiguration:
-  #       BlockPublicAcls: true
-  #       BlockPublicPolicy: true
-  #       IgnorePublicAcls: true
-  #       RestrictPublicBuckets: true
-  #   UpdateReplacePolicy: Retain
-  #   DeletionPolicy: Retain # Retainに設定しているため、CloudFormationスタックを削除する際にも強制削除を実行しないとリソースが残る設定
-  # CodePipelineArtifactsBucketPolicy:
-  #   Type: AWS::S3::BucketPolicy
-  #   Properties:
-  #     Bucket: !ImportValue s3bucketbackup
-  #     PolicyDocument:
-  #       Statement:
-  #         - Action: s3:*
-  #           Condition:
-  #             Bool:
-  #               aws:SecureTransport: 'false'
-  #           Effect: Deny
-  #           Principal:
-  #             AWS: '*'
-  #           Resource:
-  #             - !ImportValue s3bucketbackupArn
-  #             - !Join
-  #               - '/'
-  #               - - !ImportValue s3bucketbackupArn
-  #                 - '*'
-  #       Version: '2012-10-17'
