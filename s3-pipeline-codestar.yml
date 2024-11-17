@@ -20,12 +20,11 @@ Parameters:
 Resources:
 # ------------------------------------------------------------#
 # CodeBuild
-# Name: GitHubToS3Build
 # ------------------------------------------------------------#
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
-      Name: GitHubToS3Build
+      Name: github-to-s3-build
       Source:
         Type: CODEPIPELINE
         # Location: !Sub "https://github.com/${GitHubOwner}/${GitHubRepo}.git"
@@ -65,6 +64,7 @@ Resources:
 
 # ------------------------------------------------------------#
 # CodeBuildRoleにアタッチするポリシー
+# カスタマーインラインポリシー
 # ------------------------------------------------------------#
   CodeBuildPolicy:
     Type: AWS::IAM::Policy
