@@ -53,6 +53,7 @@ Resources:
   CodeBuildRole:
     Type: AWS::IAM::Role
     Properties:
+      RoleName: codebuild-role-for-s3
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -150,7 +151,7 @@ Resources:
   CodePipelineRole: 
     Type: AWS::IAM::Role
     Properties:
-      RoleName: s3-cicd-role
+      RoleName: codepipeline-role-for-s3
       AssumeRolePolicyDocument:
         Statement:
           - Action: sts:AssumeRole
@@ -192,7 +193,7 @@ Resources:
                 - - !ImportValue s3bucketbackupArn
                   - '*'
 
-          - Action: 
+          - Action: # CodePipelineに対してCodeBuildの操作権限を付与する
             - codebuild:StartBuild
             - codebuild:BatchGetBuilds
             - codebuild:BatchGetProjects
@@ -216,6 +217,7 @@ Resources:
   CodePipelineSourceActionRole: 
     Type: AWS::IAM::Role
     Properties:
+      RoleName: codepipeline-source-from-github-role
       AssumeRolePolicyDocument:
         Statement:
           - Action: sts:AssumeRole
