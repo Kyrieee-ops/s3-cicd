@@ -9,11 +9,9 @@ Parameters:
   BucketNameBackup:
     Type: String
     Default: s3-cicd-backup
-  BucketNameProd:
-    Type: String
-    Default: s3-cicd-prod
-
-  
+  # BucketNameProd:
+  #   Type: String
+  #   Default: s3-cicd-prod
 
 # ------------------------------------------------------------#
 # S3　backup
@@ -56,40 +54,40 @@ Resources:
 # ------------------------------------------------------------#
 # S3 prod
 # ------------------------------------------------------------#
-  s3bucketprod:
-    Type: AWS::S3::Bucket
-    Properties: 
-      AccessControl: Private
-      BucketName: !Sub ${BucketNameProd}-${AWS::AccountId}
-      PublicAccessBlockConfiguration:
-          BlockPublicAcls: true
-          BlockPublicPolicy: true
-          IgnorePublicAcls: true
-          RestrictPublicBuckets: true
-      VersioningConfiguration: 
-        Status: Suspended
-      BucketEncryption:
-          ServerSideEncryptionConfiguration:
-            - ServerSideEncryptionByDefault:
-                SSEAlgorithm: AES256
-              BucketKeyEnabled: true
-      Tags:
-        - Key: Name
-          Value: !Sub ${BucketNameProd}-${AWS::AccountId}
+  # s3bucketprod:
+  #   Type: AWS::S3::Bucket
+  #   Properties: 
+  #     AccessControl: Private
+  #     BucketName: !Sub ${BucketNameProd}-${AWS::AccountId}
+  #     PublicAccessBlockConfiguration:
+  #         BlockPublicAcls: true
+  #         BlockPublicPolicy: true
+  #         IgnorePublicAcls: true
+  #         RestrictPublicBuckets: true
+  #     VersioningConfiguration: 
+  #       Status: Suspended
+  #     BucketEncryption:
+  #         ServerSideEncryptionConfiguration:
+  #           - ServerSideEncryptionByDefault:
+  #               SSEAlgorithm: AES256
+  #             BucketKeyEnabled: true
+  #     Tags:
+  #       - Key: Name
+  #         Value: !Sub ${BucketNameProd}-${AWS::AccountId}
 
-  s3BucketPolicyProd:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref s3bucketprod
-      PolicyDocument: 
-        Version: "2012-10-17"
-        Statement:
-          - Action:
-            - "s3:GetObject"
-            Effect: Allow
-            Resource: !Sub "arn:${AWS::Partition}:s3:::${BucketNameProd}-${AWS::AccountId}/*"
-            Principal: 
-              AWS: !Sub arn:aws:iam::674078804300:user/Administrator
+  # s3BucketPolicyProd:
+  #   Type: AWS::S3::BucketPolicy
+  #   Properties:
+  #     Bucket: !Ref s3bucketprod
+  #     PolicyDocument: 
+  #       Version: "2012-10-17"
+  #       Statement:
+  #         - Action:
+  #           - "s3:GetObject"
+  #           Effect: Allow
+  #           Resource: !Sub "arn:${AWS::Partition}:s3:::${BucketNameProd}-${AWS::AccountId}/*"
+  #           Principal: 
+  #             AWS: !Sub arn:aws:iam::674078804300:user/Administrator
 
 Outputs:
   s3bucketbackup:
@@ -101,14 +99,10 @@ Outputs:
     Value: !Sub arn:aws:s3:::${s3bucketbackup}
     Export: 
       Name: s3bucketbackupArn
-  # s3BucketPolicyBackup:
-  #   Value: !Ref s3BucketPolicyBackup
-  #   Export:
-  #     Name: s3BucketPolicyBackup
 
-  s3BucketPolicyProd:
-    Value: !Ref s3bucketprod
-    Export:
-      Name: s3bucketprod
+  # s3BucketPolicyProd:
+  #   Value: !Ref s3bucketprod
+  #   Export:
+  #     Name: s3bucketprod
     
 

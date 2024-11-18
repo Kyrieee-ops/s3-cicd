@@ -2,7 +2,6 @@ Parameters:
   ConnectionArn:
     Description: The CodeConnections ARN for your source repository.
     Type: String
-    Default: "arn:aws:codeconnections:ap-northeast-1:674078804300:connection/daf5ec94-493c-4804-8a9b-e098942afffb"
   FullRepositoryId:
     Description: The full repository ID to use with your CodeConnections connection.
     Type: String
@@ -20,6 +19,8 @@ Parameters:
 Resources:
 # ------------------------------------------------------------#
 # CodeBuild
+# buildspecを実行するプロジェクトを定義する
+# GitHubに保存されているソースコードのビルドを行いArtifact
 # ------------------------------------------------------------#
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
@@ -27,7 +28,7 @@ Resources:
       Name: github-to-s3-build
       Source:
         Type: CODEPIPELINE
-        # Location: !Sub "https://github.com/${GitHubOwner}/${GitHubRepo}.git"
+        # pahesesにはbuild
         BuildSpec: |
           version: 0.2
           phases:
@@ -40,9 +41,9 @@ Resources:
             files:
               - '**/*'
       Environment:
-        ComputeType: BUILD_GENERAL1_SMALL
+        ComputeType: BUILD_GENERAL1_SMALL # ビルドする際のリソースを指定する(AWS公式に環境環境タイプの容量一覧があるので参考にする)
         Image: aws/codebuild/standard:5.0
-        Type: LINUX_CONTAINER
+        Type: LINUX_CONTAINER # ビルドの実行タイプをLinuxベースのコンテナを使用する
       ServiceRole: !GetAtt CodeBuildRole.Arn
       Artifacts:
         Type: CODEPIPELINE # build成果物が不要な場合はNO_ARTIFACTSを指定する
