@@ -1,3 +1,6 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: CloudFormation template to build and push Docker images to S3 from GitHub.
+
 Parameters:
   ConnectionArn:
     Description: The CodeConnections ARN for your source repository.
@@ -309,3 +312,9 @@ Resources:
             Resource: !Sub "arn:${AWS::Partition}:s3:::${BucketNameBackup}-${AWS::AccountId}/*"
             Principal: 
               AWS: !Sub arn:${AWS::Partition}:iam::674078804300:user/Administrator
+
+Outputs:
+     s3bucketbackup:
+      Value: !Ref s3bucketbackup
+      Export:
+        Name: s3bucketbackup
