@@ -317,4 +317,8 @@ Outputs:
      s3bucketbackup:
       Value: !Ref s3bucketbackup
       Export:
-        Name: s3bucketbackup
+        Name: s3bucketbackup  
+     s3BucketArn:
+      Value: !Sub arn:aws:s3:::${s3bucketbackup}
+      Export: 
+        Name: s3bucketbackupArn
