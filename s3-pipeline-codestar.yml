@@ -2,6 +2,14 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: CloudFormation template to build and push Docker images to S3 from GitHub.
 
 Parameters:
+  CodeBuildtName:
+    Description: The CodeBuildProject name
+    Type: String
+    Default: github-to-s3-build
+  CodeBuildRoleName:
+    Description: The CodeBuildRole name
+    Type: String
+    Default: codebuild-role-for-s3
   ConnectionArn:
     Description: The CodeConnections ARN for your source repository.
     Type: String
@@ -17,6 +25,14 @@ Parameters:
     Description: The CodePipeline pipeline name that will deploy to your CloudFormation stack.
     Type: String
     Default: s3-codepipeline
+  CodePipelineRoleName:
+    Description: The CodePipeline role name 
+    Type: String
+    Default: codepipeline-role-for-s3
+  CodePipelineSourceActionRoleName:
+    Description: The CodePipeline source action role name
+    Type: String
+    Default: codepipeline-source-from-github-role-for-s3
   BucketNameBackup:
     Type: String
     Default: s3-cicd-backup
@@ -30,7 +46,7 @@ Resources:
   CodeBuildProject:
     Type: AWS::CodeBuild::Project
     Properties:
-      Name: github-to-s3-build
+      Name: !Sub ${CodeBuildtName}
       Source:
         Type: CODEPIPELINE
         BuildSpec: !Sub |
@@ -54,7 +70,7 @@ Resources:
   CodeBuildRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: codebuild-role-for-s3
+      RoleName: !Sub ${CodeBuildRoleName}
       AssumeRolePolicyDocument:
         Version: '2012-10-17'
         Statement:
@@ -112,7 +128,7 @@ Resources:
         Location: !Ref s3bucketbackup
         Type: S3
       # ExecutionMode: PARALLEL # Code Pipelineが実行中であっても並列実行を制御するためにキューに入る設定
-      Name: !Ref CodePipelineName
+      Name: !Sub ${CodePipelineName}
       # PipelineType: V2
       RoleArn: !GetAtt CodePipelineRole.Arn
       Stages:
@@ -125,9 +141,9 @@ Resources:
                 Provider: CodeStarSourceConnection # CodeStarSourceConnectionを使用してGitHubと連携をする
                 Version: '1'
               Configuration:
-                ConnectionArn: !Ref ConnectionArn # 事前にCodeConnectionArnを作成しておく必要があるSource
-                FullRepositoryId: !Ref FullRepositoryId
-                BranchName: !Ref BranchName
+                ConnectionArn: !Sub ${ConnectionArn} # 事前にCodeConnectionArnを作成しておく必要があるSource
+                FullRepositoryId: !Sub ${FullRepositoryId}
+                BranchName: !Sub ${BranchName}
                 # PollForSourceChanges: false  # 自動トリガーを無効化 -> ここをfalseに設定しておかないとCloudFormation deploy時にCodePipelineが起動してしまうため
               OutputArtifacts:
                 - Name: SourceOutput # ソースステージの出力 -> 指定されたリポジトリからコードを取得しそれをSourceOutputという名前で出力アーティファクトとして生成する
@@ -157,7 +173,7 @@ Resources:
   CodePipelineRole: 
     Type: AWS::IAM::Role
     Properties:
-      RoleName: codepipeline-role-for-s3
+      RoleName: !Sub ${CodePipelineRoleName}
       AssumeRolePolicyDocument:
         Statement:
           - Action: sts:AssumeRole
@@ -225,7 +241,7 @@ Resources:
   CodePipelineSourceActionRole: 
     Type: AWS::IAM::Role
     Properties:
-      RoleName: codepipeline-source-from-github-role
+      RoleName: !Sub ${CodePipelineSourceActionRoleName}
       AssumeRolePolicyDocument:
         Statement:
           - Action: sts:AssumeRole
@@ -243,7 +259,7 @@ Resources:
         Statement:
           - Action: codestar-connections:UseConnection # CodePipelineがGitHubのソースプロバイダーに接続し、GitHubからソースを取得する
             Effect: Allow
-            Resource: !Ref ConnectionArn # AWS ⇔ GitHub接続名のARNを参照し、GitHubとの接続を使用してコードを取得が可能となる
+            Resource: !Sub ${ConnectionArn} # AWS ⇔ GitHub接続名のARNを参照し、GitHubとの接続を使用してコードを取得が可能となる
           # CodePipelineがGitHubから取得したファイルをS3へアップロードするために必要なActionの操作権限を定義
           - Action:
               - s3:Abort*
@@ -253,13 +269,12 @@ Resources:
               - s3:PutObjectRetention
               - s3:PutObjectTagging
               - s3:PutObjectVersionTagging # アップロードしたファイルにタグを付与する場合に必要
+            # `arn:aws:s3:::${s3bucketbackup}`と`arn:aws:s3:::${s3bucketbackup}/*`イコール
             Effect: Allow
             Resource:
-              # - !ImportValue s3bucketbackupArn
               - !GetAtt s3bucketbackup.Arn
               - !Join
                 - '/'
-                # - - !ImportValue s3bucketbackupArn
                 - - !GetAtt s3bucketbackup.Arn
                   - '*'
           - Action:
@@ -268,7 +283,6 @@ Resources:
             Effect: Allow
             Resource: !Join
               - /
-              # - - !ImportValue s3bucketbackupArn
               - - !GetAtt s3bucketbackup.Arn
                 - '*'
         Version: '2012-10-17'
